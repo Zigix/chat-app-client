@@ -16,9 +16,16 @@ async function readErrorBody(res: Response): Promise<ApiErrorResponse | undefine
 }
 
 export async function postJson<T>(path: string, payload: unknown): Promise<T> {
+  const token = getAccessToken();
+
+  const headers = new Headers();
+
+  if (token) headers.set("Authorization", `Bearer ${token}`);
+  headers.set("Content-Type", "application/json");
+
   const res = await fetch(`${"http://localhost:8080/"}${path}`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: headers,
     body: JSON.stringify(payload),
   });
 

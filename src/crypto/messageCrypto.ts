@@ -1,4 +1,4 @@
-import { b64FromBytes, utf8ToBytes } from "./bytes";
+import { b64FromBytes, bytesFromB64, toAb, utf8ToBytes } from "./bytes";
 
 export type EncryptedMessage = {
   ciphertextB64: string;
@@ -31,6 +31,20 @@ export async function encryptMessageAesGcm(
     ivB64: b64FromBytes(iv),
     aadB64: b64FromBytes(aadBytes),
   };
+}
+
+export async function decryptMessageAesGcm(roomKey: CryptoKey, msg: EncryptedMessage): Promise<string> {
+  const iv = bytesFromB64(msg.ivB64);
+  const aad = bytesFromB64(msg.aadB64);
+  const ct = bytesFromB64(msg.ciphertextB64);
+
+  const ptBuf = await crypto.subtle.decrypt(
+    { name: "AES-GCM", iv: toAb(iv), additionalData: toAb(aad) },
+    roomKey,
+    toAb(ct)
+  );
+
+  return new TextDecoder().decode(new Uint8Array(ptBuf));
 }
 
 // eslint-disable-next-line no-empty-pattern

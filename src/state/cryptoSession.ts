@@ -1,5 +1,6 @@
 export type CryptoSession = {
-  myUserId: string;
+  myUserId: number;
+  myMasterKey: CryptoKey;
   myEcdhPrivateKey: CryptoKey;
   myEcdhPublicKey: CryptoKey;
 };

@@ -55,6 +55,37 @@ export async function importEcdhPrivateJwk(privJwkJson: string): Promise<CryptoK
   );
 }
 
+export async function importEcdhPublicJwk(pubJwkJson: string): Promise<CryptoKey> {
+  const jwk = JSON.parse(pubJwkJson);
+  return crypto.subtle.importKey(
+    "jwk",
+    jwk,
+    { name: "ECDH", namedCurve: "P-256" },
+    true,
+    []
+  );
+}
+
+export async function deriveEcdhSharedSecretBits(myPrivateKey: CryptoKey, theirPublicKey: CryptoKey): Promise<Uint8Array> {
+  const bits = await crypto.subtle.deriveBits({ name: "ECDH", public: theirPublicKey }, myPrivateKey, 256);
+  return new Uint8Array(bits);
+}
+
+export async function hkdfDeriveAesGcmKey(params: {
+  ikm: Uint8Array;
+  salt: Uint8Array;
+  info: Uint8Array;
+}): Promise<CryptoKey> {
+  const keyMaterial = await crypto.subtle.importKey("raw", toAb(params.ikm), "HKDF", false, ["deriveKey"]);
+  return crypto.subtle.deriveKey(
+    { name: "HKDF", hash: "SHA-256", salt: toAb(params.salt), info: toAb(params.info) },
+    keyMaterial,
+    { name: "AES-GCM", length: 256 },
+    false,
+    ["encrypt", "decrypt"]
+  );
+}
+
 export async function aesGcmEncryptBytes(key: CryptoKey, plaintext: Uint8Array, aad?: Uint8Array) {
   const iv = randomBytes(12);
   const params: AesGcmParams = aad

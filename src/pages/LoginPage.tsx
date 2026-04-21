@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { loginUser }from '../api/auth';
 import { AuthLayout } from "../components/AuthLayout";
-import { recoverSessionKeys } from "../crypto/webcrypto";
+import { importEcdhPublicJwk, recoverSessionKeys } from "../crypto/webcrypto";
+import { setCryptoSession } from "../state/cryptoSession";
 
 const ACCESS_TOKEN_KEY = "accessToken";
 const REFRESH_TOKEN_KEY = "refreshToken";
@@ -32,6 +33,15 @@ export function LoginPage({ onGoRegister, onLoggedIn }: Props) {
       const vault = loginUserResponse.vaultDto;
       const keys = await recoverSessionKeys(password, vault);
       console.log("Recovered session keys:", keys);
+
+      const publicEcdhKey = await importEcdhPublicJwk(loginUserResponse.pubEcdhJwk);
+
+      setCryptoSession({
+        myUserId: loginUserResponse.userId,
+        myMasterKey: keys.mkAesKey,
+        myEcdhPublicKey: publicEcdhKey,
+        myEcdhPrivateKey: keys.ecdhPrivateKey
+      });
 
       onLoggedIn(username);
     } catch (err: unknown) {

@@ -6,6 +6,7 @@ import { encryptMessage } from "../crypto/messageCrypto";
 import { wsClient } from "../ws/wsClient";
 
 import { getRoomKey } from "../state/roomKeys";
+import { createPrivateMessage, getPublicEcdhForUser } from "../api/chat";
 
 type Conversation = {
   id: string;
@@ -120,7 +121,16 @@ export function ChatHomePage({
 
   setDraft("");
 }
-  function startConversationWithUser(u: SearchUserResponse) {
+  async function startConversationWithUser(u: SearchUserResponse) {
+    console.log(u);
+    const res = await createPrivateMessage({otherUserId: u.id});
+
+    const publicEcdhJwk = await getPublicEcdhForUser(u.id);
+    console.log(publicEcdhJwk);
+    
+    console.log(res);
+
+
     const convId = `dm:${u.id}`;
 
     const exists = conversations.find((c) => c.id === convId);
