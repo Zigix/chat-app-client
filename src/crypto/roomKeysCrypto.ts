@@ -2,18 +2,18 @@ import { bytesToB64, randomBytes, utf8 } from "./bytes";
 import { aesGcmEncryptBytes, importEcdhPublicJwk, deriveEcdhSharedSecretBits, hkdfDeriveAesGcmKey } from "./webcrypto";
 
 type GroupMember = {
-  userId: string;
+  userId: number;
   publicEcdhJwk: string; // dla innych userów
 };
 
 type SenderContext = {
-  userId: string;
+  userId: number;
   mkAesKey: CryptoKey;
   ecdhPrivateKey: CryptoKey;
 };
 
 export async function createRoomKeysForUsers(params: {
-  roomId: string;
+  roomId: number;
   sender: SenderContext;
   members: GroupMember[]; // zawiera też sendera!
   version: number;
@@ -26,7 +26,7 @@ export async function createRoomKeysForUsers(params: {
   const roomKeyRaw = randomBytes(32);
 
   const keyItems: {
-    userId: string;
+    userId: number;
     wrappedRoomKeyB64: string;
     ivB64: string;
     aadB64: string;

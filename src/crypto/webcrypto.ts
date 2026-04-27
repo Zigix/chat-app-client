@@ -1,5 +1,5 @@
 import { randomBytes, bytesToB64, utf8, b64ToBytes, toAb } from "./bytes";
-import type { SessionKeys } from "./vault";
+import type { SessionKeys } from "../types/vault";
 
 export async function deriveKEK(password: string, salt: Uint8Array, iterations: number): Promise<CryptoKey> {
 

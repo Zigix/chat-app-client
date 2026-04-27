@@ -1,50 +1,23 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import { useMemo, useState } from "react";
 import type { SearchUserResponse } from "../api/users";
 import { NewConversationModal } from "../components/NewConversationModal";
 
-import { encryptMessage } from "../crypto/messageCrypto";
+import { decryptMessageAesGcm, encryptMessage, encryptMessageAesGcm } from "../crypto/messageCrypto";
 import { wsClient } from "../ws/wsClient";
 
 import { getRoomKey } from "../state/roomKeys";
-import { createPrivateMessage, getPublicEcdhForUser } from "../api/chat";
-
-type Conversation = {
-  id: string;
-  name: string;
-  type: "dm" | "group";
-  lastMessage: string;
-  lastTime: string;
-};
+import { createOrGetPrivateConversation, getPublicEcdhForUser } from "../api/chat";
+import { getCryptoSession } from "../state/cryptoSession";
+import { createRoomKeysForUsers } from "../crypto/roomKeysCrypto";
+import { importAesKeyFromRaw } from "../crypto/webcrypto";
+import { useChat } from "../hooks/useChat";
 
 type Message = {
   id: string;
   fromMe: boolean;
   text: string;
 };
-
-const DEMO_CONVERSATIONS: Conversation[] = [
-  {
-    id: "u-a",
-    name: "TestUserA",
-    type: "dm",
-    lastMessage: "How are you doing?",
-    lastTime: "12:48",
-  },
-  {
-    id: "u-b",
-    name: "TestUserB",
-    type: "dm",
-    lastMessage: "Last message",
-    lastTime: "10:11",
-  },
-  {
-    id: "g-x",
-    name: "TestGroupX",
-    type: "group",
-    lastMessage: "Last message in group",
-    lastTime: "yesterday",
-  },
-];
 
 const DEMO_MESSAGES: Record<string, Message[]> = {
   "u-a": [
@@ -66,13 +39,11 @@ export function ChatHomePage({
   usernameInitial: string;
   onLogout: () => void;
 }) {
+  const {conversations, selectedId, setSelectedId, startPrivateConversation} = useChat();
   const [newConvOpen, setNewConvOpen] = useState(false);
   const [query, setQuery] = useState("");
-  const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const [draft, setDraft] = useState("");
-  const [conversations, setConversations] =
-    useState<Conversation[]>(DEMO_CONVERSATIONS);
 
   const filteredConversations = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -84,7 +55,7 @@ export function ChatHomePage({
 
   const messages = selected ? (DEMO_MESSAGES[selected.id] ?? []) : [];
 
-  function selectConversation(id: string) {
+  function selectConversation(id: number) {
     setSelectedId(id);
   }
 
@@ -123,7 +94,7 @@ export function ChatHomePage({
 }
   async function startConversationWithUser(u: SearchUserResponse) {
     console.log(u);
-    const res = await createPrivateMessage({otherUserId: u.id});
+    const res = await createOrGetPrivateConversation({otherUserId: u.id});
 
     const publicEcdhJwk = await getPublicEcdhForUser(u.id);
     console.log(publicEcdhJwk);
@@ -131,21 +102,45 @@ export function ChatHomePage({
     console.log(res);
 
 
-    const convId = `dm:${u.id}`;
+    // Creating room Keys
 
-    const exists = conversations.find((c) => c.id === convId);
-    if (!exists) {
-      const newConv: Conversation = {
-        id: convId,
-        name: u.username,
-        type: "dm",
-        lastMessage: "Started conversation",
-        lastTime: "now",
-      };
-      setConversations((prev) => [newConv, ...prev]);
-    }
+    const groupMembers = res.roomMembersDataList.map((rm) => ({userId: rm.userId, publicEcdhJwk: rm.publicEcdhJwk}));
 
-    setSelectedId(convId);
+    console.log(groupMembers);
+
+    const cryptoSessionData = getCryptoSession();
+
+    const senderContext = {
+      userId: cryptoSessionData.myUserId,
+      mkAesKey: cryptoSessionData.myMasterKey,
+      ecdhPrivateKey: cryptoSessionData.myEcdhPrivateKey
+    };
+
+
+    const roomKeyCreationResponse = await createRoomKeysForUsers({roomId: res.roomId, sender: senderContext, members: groupMembers, version: res.currentKeyVersion});
+
+    console.log(roomKeyCreationResponse);
+
+    const roomKeyCryptoKey = await importAesKeyFromRaw(roomKeyCreationResponse.roomKeyRaw);
+    
+    console.log(roomKeyCryptoKey);
+
+    console.log("//////TEST//////");
+
+    const encryptedMessage = await encryptMessageAesGcm(roomKeyCryptoKey, "Hello message", {aad: "xd"});
+
+    console.log("Encrypted message:");
+    console.log(encryptedMessage);
+
+    const decryptedMessage = await decryptMessageAesGcm(roomKeyCryptoKey, encryptedMessage);
+
+    console.log("Decrypted message");
+    console.log(decryptedMessage);
+
+
+    //END OF TEST////
+
+    setSelectedId(res.roomId);
     setNewConvOpen(false);
   }
 
@@ -217,10 +212,6 @@ export function ChatHomePage({
                   </div>
                   <div>
                     <div className="conv-name">{c.name}</div>
-                    <div className="conv-last">
-                      <span title={c.lastMessage}>{c.lastMessage}</span>
-                      <span>{c.lastTime}</span>
-                    </div>
                   </div>
                 </button>
               ))}
@@ -288,7 +279,7 @@ export function ChatHomePage({
       <NewConversationModal
         open={newConvOpen}
         onClose={() => setNewConvOpen(false)}
-        onPickUser={startConversationWithUser}
+        onPickUser={startPrivateConversation}
       />
     </div>
   );

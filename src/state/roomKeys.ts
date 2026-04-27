@@ -1,17 +1,15 @@
 type RoomKeyEntry = {
-  version: number;
   key: CryptoKey;
-  roomKey: CryptoKey;
-  keyVersion: number;
+  version: number;
 };
 
-const map = new Map<string, RoomKeyEntry>();
+const map = new Map<number, RoomKeyEntry>();
 
-export function putRoomKey(roomId: string, entry: RoomKeyEntry) {
+export function putRoomKey(roomId: number, entry: RoomKeyEntry) {
   map.set(roomId, entry);
 }
 
-export function getRoomKey(roomId: string) {
+export function getRoomKey(roomId: number) {
   return map.get(roomId);
 }
 
