@@ -1,13 +1,7 @@
 import { useEffect, useState } from "react";
 import { createPrivateRoom } from "../services/chatService";
 import { setupRoomKeyForRoom } from "../services/roomKeyService";
-import { getRecentConversations } from "../api/chat";
-
-export type Conversation = {
-  id: number,
-  type: string,
-  name: string
-};
+import { getRecentConversations, getRoomKey, type Conversation } from "../api/chat";
 
 export function useChat() {
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -17,7 +11,9 @@ export function useChat() {
     async function getRecent() {
       const recentConversations = (await getRecentConversations());
 
-      setConversations(recentConversations);
+      recentConversations.forEach()
+
+      setConversations(recentConversations)
     };
 
     getRecent();
@@ -28,6 +24,9 @@ export function useChat() {
     username: string;
   }) {
     const room = await createPrivateRoom(user.id);
+
+    const myKey = await getRoomKey(room.roomId, room.currentKeyVersion);
+    console.log(myKey);
 
     console.log(room);
 
@@ -43,8 +42,9 @@ export function useChat() {
 
     const conversation: Conversation = {
       id: room.roomId,
-      name: user.username,
+      name: room.roomName,
       type: "PRIVATE",
+      currentKeyVersion: room.currentKeyVersion
     };
 
     setConversations((prev) => {

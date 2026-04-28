@@ -33,16 +33,30 @@ export async function getPublicEcdhForUser(userId: number) {
   return apiFetch<Conversation[]>("/rooms/recent");
 } */
 
-export type RecentConversation = {
+export type Conversation = {
   id: number,
   type: string,
-  name: string
+  name: string,
+  currentKeyVersion: number
 };
 
 export async function getRecentConversations() {
-  return apiFetch<RecentConversation[]>("/rooms/recent");
+  return apiFetch<Conversation[]>("/rooms/recent");
 }
 
 export async function uploadKeys(roomId: number, request: UploadRoomKeysApiRequest) {
   return postJson<string>(`api/rooms/${roomId}/keys/bulk`, request);
+}
+
+export type MyKeyResponse = {
+  roomId: number,
+  version: number,
+  wrappedByUserId: number,
+  wrappedRoomKeyB64: string,
+  ivB64: string,
+  aadB64: string
+}
+
+export async function getRoomKey(roomId: number, version: number) {
+  return apiFetch<MyKeyResponse>(`/rooms/${roomId}/my-key?version=${version}`);
 }
