@@ -1,146 +1,69 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
+// pages/ChatHomePage.tsx
+
 import { useMemo, useState } from "react";
-import type { SearchUserResponse } from "../api/users";
 import { NewConversationModal } from "../components/NewConversationModal";
-
-import { decryptMessageAesGcm, encryptMessage, encryptMessageAesGcm } from "../crypto/messageCrypto";
-import { wsClient } from "../ws/wsClient";
-
-import { getRoomKey } from "../state/roomKeys";
-import { createOrGetPrivateConversation, getPublicEcdhForUser } from "../api/chat";
-import { getCryptoSession } from "../state/cryptoSession";
-import { createRoomKeysForUsers } from "../crypto/roomKeysCrypto";
-import { importAesKeyFromRaw } from "../crypto/webcrypto";
+import type { SearchUserResponse } from "../api/users";
+import { useWebSocket } from "../hooks/useWebSocket";
 import { useChat } from "../hooks/useChat";
+import { useMessages } from "../hooks/useMessages";
 
-type Message = {
-  id: string;
-  fromMe: boolean;
-  text: string;
-};
-
-const DEMO_MESSAGES: Record<string, Message[]> = {
-  "u-a": [
-    { id: "m1", fromMe: false, text: "Hi, how are you doing?" },
-    { id: "m2", fromMe: true, text: "Hello there!" },
-    { id: "m3", fromMe: true, text: "Everything is going well." },
-    { id: "m4", fromMe: true, text: "How about you?" },
-  ],
-  "u-b": [{ id: "m1", fromMe: false, text: "Hello!" }],
-  "g-x": [{ id: "m1", fromMe: false, text: "Welcome to the group" }],
+type ChatHomePageProps = {
+  appName: string;
+  token: string;
+  myUserId: number;
+  usernameInitial: string;
+  onLogout: () => void;
 };
 
 export function ChatHomePage({
   appName,
+  myUserId,
   usernameInitial,
   onLogout,
-}: {
-  appName: string;
-  usernameInitial: string;
-  onLogout: () => void;
-}) {
-  const {conversations, selectedId, setSelectedId, startPrivateConversation} = useChat();
+}: ChatHomePageProps) {
   const [newConvOpen, setNewConvOpen] = useState(false);
   const [query, setQuery] = useState("");
-
   const [draft, setDraft] = useState("");
+
+  // 1. Uruchamia STOMP connection
+  const token = localStorage.getItem("accessToken");
+  const { connected } = useWebSocket(token);
+
+  // 2. Zarządza listą rozmów
+  const {
+    conversations,
+    selected,
+    selectedId,
+    setSelectedId,
+    startPrivateConversation,
+  } = useChat();
+
+  // 3. Zarządza wiadomościami dla aktywnego roomu
+  const {
+    messages,
+    loading,
+    sendMessage,
+  } = useMessages(selectedId, myUserId, connected);
 
   const filteredConversations = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return conversations;
-    return conversations.filter((c) => c.name.toLowerCase().includes(q));
+
+    return conversations.filter((c) =>
+      c.name.toLowerCase().includes(q)
+    );
   }, [query, conversations]);
 
-  const selected = conversations.find((c) => c.id === selectedId) ?? null;
+  async function handleSend() {
+    const text = draft.trim();
+    if (!text || !selectedId) return;
 
-  const messages = selected ? (DEMO_MESSAGES[selected.id] ?? []) : [];
-
-  function selectConversation(id: number) {
-    setSelectedId(id);
+    await sendMessage(text);
+    setDraft("");
   }
 
-  function sendMessage() {
-  if (!selected || !draft.trim()) return;
-
-  const roomId = selected.id;
-  const clientMessageId = crypto.randomUUID();
-
-  const roomKey = getRoomKey(roomId);
-
-  if (!roomKey) {
-    console.error("No room key for room", roomId);
-    return;
-  }
-
-  const encrypted = encryptMessage({
-    plaintext: draft,
-    key: roomKey.key,
-  });
-
-  const payload = {
-    clientMessageId,
-    keyVersion: roomKey.version,
-    ciphertextB64: encrypted.ciphertextB64,
-    ivB64: encrypted.ivB64,
-    aadB64: encrypted.aadB64,
-  };
-
-  wsClient.publish({
-    destination: `/app/rooms/${roomId}/send`,
-    body: JSON.stringify(payload),
-  });
-
-  setDraft("");
-}
-  async function startConversationWithUser(u: SearchUserResponse) {
-    console.log(u);
-    const res = await createOrGetPrivateConversation({otherUserId: u.id});
-
-    const publicEcdhJwk = await getPublicEcdhForUser(u.id);
-    console.log(publicEcdhJwk);
-    
-    console.log(res);
-
-
-    // Creating room Keys
-
-    const groupMembers = res.roomMembersDataList.map((rm) => ({userId: rm.userId, publicEcdhJwk: rm.publicEcdhJwk}));
-
-    console.log(groupMembers);
-
-    const cryptoSessionData = getCryptoSession();
-
-    const senderContext = {
-      userId: cryptoSessionData.myUserId,
-      mkAesKey: cryptoSessionData.myMasterKey,
-      ecdhPrivateKey: cryptoSessionData.myEcdhPrivateKey
-    };
-
-
-    const roomKeyCreationResponse = await createRoomKeysForUsers({roomId: res.roomId, sender: senderContext, members: groupMembers, version: res.currentKeyVersion});
-
-    console.log(roomKeyCreationResponse);
-
-    const roomKeyCryptoKey = await importAesKeyFromRaw(roomKeyCreationResponse.roomKeyRaw);
-    
-    console.log(roomKeyCryptoKey);
-
-    console.log("//////TEST//////");
-
-    const encryptedMessage = await encryptMessageAesGcm(roomKeyCryptoKey, "Hello message", {aad: "xd"});
-
-    console.log("Encrypted message:");
-    console.log(encryptedMessage);
-
-    const decryptedMessage = await decryptMessageAesGcm(roomKeyCryptoKey, encryptedMessage);
-
-    console.log("Decrypted message");
-    console.log(decryptedMessage);
-
-
-    //END OF TEST////
-
-    setSelectedId(res.roomId);
+  async function handlePickUser(user: SearchUserResponse) {
+    await startPrivateConversation(user);
     setNewConvOpen(false);
   }
 
@@ -151,6 +74,10 @@ export function ChatHomePage({
           <div className="app-badge">
             <div className="app-dot" />
             <div className="app-name">{appName}</div>
+          </div>
+
+          <div style={{ marginLeft: 12, fontSize: 12 }}>
+            WS: {connected ? "connected" : "disconnected"}
           </div>
         </div>
 
@@ -170,6 +97,7 @@ export function ChatHomePage({
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search for user or group"
           />
+
           <button
             className="btn btn-ghost"
             type="button"
@@ -181,7 +109,7 @@ export function ChatHomePage({
           <button
             className="btn btn-ghost"
             type="button"
-            onClick={() => alert("(DEMO) nowa grupa")}
+            onClick={() => alert("TODO: create group")}
           >
             New group
           </button>
@@ -191,7 +119,6 @@ export function ChatHomePage({
       <div className="main">
         <div className={`shell ${selected ? "with-chat" : "no-chat"}`}>
           <aside className="sidebar">
-
             <div className="sidebar-header">
               <div className="sidebar-title">
                 {selected ? "Chats" : "Last chats"}
@@ -204,12 +131,13 @@ export function ChatHomePage({
                 <button
                   key={c.id}
                   className={`conv ${selectedId === c.id ? "active" : ""}`}
-                  onClick={() => selectConversation(c.id)}
+                  onClick={() => setSelectedId(c.id)}
                   type="button"
                 >
                   <div className="conv-avatar">
                     {c.name.slice(0, 1).toUpperCase()}
                   </div>
+
                   <div>
                     <div className="conv-name">{c.name}</div>
                   </div>
@@ -230,26 +158,27 @@ export function ChatHomePage({
                   </div>
                 </div>
 
-                <div style={{ display: "flex", gap: 10 }}>
-                  <button
-                    className="btn btn-ghost"
-                    type="button"
-                    onClick={() => setSelectedId(null)}
-                  >
-                    Close
-                  </button>
-                </div>
+                <button
+                  className="btn btn-ghost"
+                  type="button"
+                  onClick={() => setSelectedId(null)}
+                >
+                  Close
+                </button>
               </div>
 
               <div className="chat-body">
-                {messages.map((m) => (
-                  <div
-                    key={m.id}
-                    className={`bubble ${m.fromMe ? "me" : "them"}`}
-                  >
-                    {m.text}
-                  </div>
-                ))}
+                {loading && <div className="chat-sub">Loading messages…</div>}
+
+                {!loading &&
+                  messages.map((m) => (
+                    <div
+                      key={m.id}
+                      className={`bubble ${m.fromMe ? "me" : "them"}`}
+                    >
+                      {m.text}
+                    </div>
+                  ))}
               </div>
 
               <div className="chat-input">
@@ -259,14 +188,17 @@ export function ChatHomePage({
                   onChange={(e) => setDraft(e.target.value)}
                   placeholder="Type message…"
                   onKeyDown={(e) => {
-                    if (e.key === "Enter") sendMessage();
+                    if (e.key === "Enter") {
+                      handleSend();
+                    }
                   }}
                 />
+
                 <button
                   className="send"
                   type="button"
-                  disabled={!draft.trim()}
-                  onClick={sendMessage}
+                  disabled={!draft.trim() || !connected}
+                  onClick={handleSend}
                 >
                   Send
                 </button>
@@ -279,7 +211,7 @@ export function ChatHomePage({
       <NewConversationModal
         open={newConvOpen}
         onClose={() => setNewConvOpen(false)}
-        onPickUser={startPrivateConversation}
+        onPickUser={handlePickUser}
       />
     </div>
   );

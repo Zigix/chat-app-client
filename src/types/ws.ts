@@ -12,9 +12,9 @@ export type WsSendMessage = {
 };
 
 export type WsNewMessage = {
-  id: string;
-  roomId: string;
-  senderId: string;
+  id: number;
+  roomId: number;
+  senderId: number;
   createdAt: string;
   keyVersion: number;
   ciphertextB64: string;

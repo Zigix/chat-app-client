@@ -13,3 +13,7 @@ export async function searchUsers(q: string, signal?: AbortSignal): Promise<Sear
     signal,
   });
 }
+
+export async function getUserPublicEcdhJwk(userId: number) {
+  return apiFetch<string>(`/users/${userId}/public-key`);
+}

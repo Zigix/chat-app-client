@@ -1,7 +1,7 @@
 import { createRoomKeysForUsers } from "../crypto/roomKeysCrypto";
 import { importAesKeyFromRaw } from "../crypto/webcrypto";
 import { getCryptoSession } from "../state/cryptoSession";
-import { putRoomKey } from "../state/roomKeys";
+import { putRoomKey } from "../state/roomKeysStore";
 import { uploadRoomKeys } from "./chatService";
 
 export type UploadRoomKeysApiRequest = {

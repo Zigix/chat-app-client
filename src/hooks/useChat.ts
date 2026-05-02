@@ -1,19 +1,23 @@
-import { useEffect, useState } from "react";
-import { createPrivateRoom } from "../services/chatService";
+import { useEffect, useMemo, useState } from "react";
+import { createPrivateRoom, getRoomKeys } from "../services/chatService";
 import { setupRoomKeyForRoom } from "../services/roomKeyService";
-import { getRecentConversations, getRoomKey, type Conversation } from "../api/chat";
+import { getRecentConversations, type Conversation } from "../api/chat";
 
 export function useChat() {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [selectedId, setSelectedId] = useState<number | null>(null);
 
+  const selected = useMemo(
+    () => conversations.find((c) => c.id === selectedId) ?? null,
+    [conversations, selectedId]
+  );
+
   useEffect(() => {
     async function getRecent() {
       const recentConversations = (await getRecentConversations());
 
-      recentConversations.forEach()
-
-      setConversations(recentConversations)
+      recentConversations.forEach((conv) => getRoomKeys(conv.id, conv.currentKeyVersion));
+      setConversations(recentConversations);
     };
 
     getRecent();
@@ -25,7 +29,8 @@ export function useChat() {
   }) {
     const room = await createPrivateRoom(user.id);
 
-    const myKey = await getRoomKey(room.roomId, room.currentKeyVersion);
+    const myKey = await getRoomKeys(room.roomId, room.currentKeyVersion);
+    console.log("My keys:")
     console.log(myKey);
 
     console.log(room);
@@ -57,6 +62,7 @@ export function useChat() {
 
   return {
     conversations,
+    selected,
     selectedId,
     setSelectedId,
     startPrivateConversation,

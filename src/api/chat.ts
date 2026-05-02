@@ -1,4 +1,5 @@
 import type { UploadRoomKeysApiRequest } from "../services/roomKeyService";
+import type { WsNewMessage } from "../types/ws";
 import { apiFetch, postJson } from "./client";
 
 export type CreateDmRequest = {
@@ -59,4 +60,8 @@ export type MyKeyResponse = {
 
 export async function getRoomKey(roomId: number, version: number) {
   return apiFetch<MyKeyResponse>(`/rooms/${roomId}/my-key?version=${version}`);
+}
+
+export async function getMessagesForRoom(roomId: number) {
+  return apiFetch<WsNewMessage>(`/rooms/${roomId}/messages`);
 }

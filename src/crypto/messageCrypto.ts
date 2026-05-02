@@ -46,13 +46,3 @@ export async function decryptMessageAesGcm(roomKey: CryptoKey, msg: EncryptedMes
 
   return new TextDecoder().decode(new Uint8Array(ptBuf));
 }
-
-// eslint-disable-next-line no-empty-pattern
-export function encryptMessage({  }: { plaintext: string; key: CryptoKey }) {
-  return {
-    // to implement yet
-    ciphertextB64: "...",
-    ivB64: "...",
-    aadB64: "...",
-  };
-}
